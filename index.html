@@ -836,15 +836,16 @@
                 <g ref={zoomGroupRef}>
                   <rect className="zoom-bg" x={-2000} y={-2000} width={VIEW_W + 4000} height={VIEW_H + 4000} fill="transparent" />
 
-                  {/* Map background — OSM tiles centered on Calgary (51.0447°N, 114.0719°W), zoom 11 */}
+                  {/* Map background — ESRI Light Gray Canvas, Calgary (51.0447°N, 114.0719°W), zoom 11 */}
                   {/* Tile grid: x 373-376, y 684-686. Calgary center lands at pixel (504, 358) in the grid, */}
                   {/* which maps to SVG (470, 360) — the centre of MAP_BOUNDS. Grid origin: SVG (-34, 2).   */}
+                  {/* ESRI tile URL order is /z/y/x (not /z/x/y like OSM).                                 */}
                   <g clipPath="url(#mapClip)" style={{ pointerEvents: 'none' }}>
                     {[373, 374, 375, 376].flatMap((tx, xi) =>
                       [684, 685, 686].map((ty, yi) => (
                         <image
                           key={`tile-${tx}-${ty}`}
-                          href={`https://tile.openstreetmap.org/11/${tx}/${ty}.png`}
+                          href={`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/11/${ty}/${tx}`}
                           x={-34 + xi * 256}
                           y={2 + yi * 256}
                           width={256}
@@ -854,7 +855,7 @@
                     )}
                     {/* Theme tint — heavier in dark mode to keep schematic readable */}
                     <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
-                      fill={C.mapBg} opacity={theme === 'dark' ? 0.55 : 0.08} />
+                      fill={C.mapBg} opacity={theme === 'dark' ? 0.55 : 0.04} />
                   </g>
                   <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
                     fill="none" stroke={C.border} strokeWidth="1" rx="3" style={{ pointerEvents: 'none' }} />
@@ -867,7 +868,7 @@
                   <g style={{ pointerEvents: 'none' }}>
                     <text x={MAP_BOUNDS.x} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">REGIONAL GRID · CALGARY · SCHEMATIC</text>
                     <text x={LANE_X + 10} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">DECISION LANE</text>
-                    <text x={MAP_BOUNDS.x + MAP_BOUNDS.w - 2} y={MAP_BOUNDS.y + MAP_BOUNDS.h + 15} textAnchor="end" fill={C.textDim} fontSize="8" fontFamily="JetBrains Mono, monospace" opacity="0.6">© OpenStreetMap contributors</text>
+                    <text x={MAP_BOUNDS.x + MAP_BOUNDS.w - 2} y={MAP_BOUNDS.y + MAP_BOUNDS.h + 15} textAnchor="end" fill={C.textDim} fontSize="8" fontFamily="JetBrains Mono, monospace" opacity="0.6">© Esri, HERE, Garmin</text>
                   </g>
 
                   {/* Data Center landmark */}
