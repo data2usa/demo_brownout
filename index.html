@@ -71,37 +71,37 @@
         bg:        '#F4F1EA',
         bgPanel:   '#FBF9F3',
         bgSubtle:  '#EFEBE0',
-        border:    '#D6CFBE',
-        borderHi:  '#B8AE96',
+        border:    '#C8C0AE',
+        borderHi:  '#8A8070',
         gridLine:  '#E2DCCB',
-        text:      '#2A2A26',
-        textMuted: '#6B6757',
-        textDim:   '#9A9484',
-        accent:    '#3F6B2F',
+        text:      '#1A1A16',
+        textMuted: '#50483A',
+        textDim:   '#8A8070',
+        accent:    '#1E7A0A',
         accentDim: '#A8C58F',
-        warn:      '#B8531F',
-        warnDim:   '#E8B89E',
-        cyan:      '#2F6B78',
-        gold:      '#9A7A1F',
+        warn:      '#C84010',
+        warnDim:   '#F0A880',
+        cyan:      '#0E7888',
+        gold:      '#9A7A00',
         nodeFill: {
-          DataCube:          '#DCE8CE',
-          Disturbance:       '#F2D4BF',
-          Observation:       '#D4E2E5',
-          DisturbanceZone:   '#F0DFCB',
-          NegotiationRound:  '#EFE4C7',
-          Contribution:      '#F4ECD2',
-          ConsensusProposal: '#CCDDE0',
-          ExecutionPlan:     '#D4E0D2',
-          Approval:          '#EFE4C7',
-          Operator:          '#E6E3DA',
+          DataCube:          '#9DD880',
+          Disturbance:       '#F5A070',
+          Observation:       '#88C8D8',
+          DisturbanceZone:   '#F0C060',
+          NegotiationRound:  '#E0C050',
+          Contribution:      '#EED870',
+          ConsensusProposal: '#68B0C8',
+          ExecutionPlan:     '#90C890',
+          Approval:          '#E0C050',
+          Operator:          '#B8B4A8',
         },
-        mapBg:        '#EEEAD9',
-        mapTerrain:   '#E5E0CB',
+        mapBg:        '#F8F5EE',
+        mapTerrain:   '#EDE8DA',
         mapContour:   '#D6CFBA',
-        transmission: '#9A8E70',
+        transmission: '#7A7060',
         laneBg:       '#EFEBE0',
         laneSep:      '#C8BFA8',
-        dataCenter:   '#B8531F',
+        dataCenter:   '#C84010',
       },
     };
 
@@ -831,31 +831,41 @@
                   <clipPath id="mapClip">
                     <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20} rx="3" />
                   </clipPath>
+                  {/* Desaturate + wash out tiles so the map reads as context, not feature */}
+                  <filter id="mapTile" x="0%" y="0%" width="100%" height="100%" colorInterpolationFilters="sRGB">
+                    <feColorMatrix type="saturate" values="0.28" />
+                    <feComponentTransfer>
+                      <feFuncR type="linear" slope="0.55" intercept="0.42" />
+                      <feFuncG type="linear" slope="0.55" intercept="0.42" />
+                      <feFuncB type="linear" slope="0.55" intercept="0.42" />
+                    </feComponentTransfer>
+                  </filter>
                 </defs>
 
                 <g ref={zoomGroupRef}>
                   <rect className="zoom-bg" x={-2000} y={-2000} width={VIEW_W + 4000} height={VIEW_H + 4000} fill="transparent" />
 
-                  {/* Map background — ESRI Light Gray Canvas, Calgary (51.0447°N, 114.0719°W), zoom 11 */}
+                  {/* Map background — OSM tiles centered on Calgary (51.0447°N, 114.0719°W), zoom 11 */}
                   {/* Tile grid: x 373-376, y 684-686. Calgary center lands at pixel (504, 358) in the grid, */}
                   {/* which maps to SVG (470, 360) — the centre of MAP_BOUNDS. Grid origin: SVG (-34, 2).   */}
-                  {/* ESRI tile URL order is /z/y/x (not /z/x/y like OSM).                                 */}
                   <g clipPath="url(#mapClip)" style={{ pointerEvents: 'none' }}>
-                    {[373, 374, 375, 376].flatMap((tx, xi) =>
-                      [684, 685, 686].map((ty, yi) => (
-                        <image
-                          key={`tile-${tx}-${ty}`}
-                          href={`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/11/${ty}/${tx}`}
-                          x={-34 + xi * 256}
-                          y={2 + yi * 256}
-                          width={256}
-                          height={256}
-                        />
-                      ))
-                    )}
+                    <g filter={theme === 'dark' ? undefined : 'url(#mapTile)'}>
+                      {[373, 374, 375, 376].flatMap((tx, xi) =>
+                        [684, 685, 686].map((ty, yi) => (
+                          <image
+                            key={`tile-${tx}-${ty}`}
+                            href={`https://tile.openstreetmap.org/11/${tx}/${ty}.png`}
+                            x={-34 + xi * 256}
+                            y={2 + yi * 256}
+                            width={256}
+                            height={256}
+                          />
+                        ))
+                      )}
+                    </g>
                     {/* Theme tint — heavier in dark mode to keep schematic readable */}
                     <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
-                      fill={C.mapBg} opacity={theme === 'dark' ? 0.55 : 0.04} />
+                      fill={C.mapBg} opacity={theme === 'dark' ? 0.55 : 0.12} />
                   </g>
                   <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
                     fill="none" stroke={C.border} strokeWidth="1" rx="3" style={{ pointerEvents: 'none' }} />
@@ -868,7 +878,7 @@
                   <g style={{ pointerEvents: 'none' }}>
                     <text x={MAP_BOUNDS.x} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">REGIONAL GRID · CALGARY · SCHEMATIC</text>
                     <text x={LANE_X + 10} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">DECISION LANE</text>
-                    <text x={MAP_BOUNDS.x + MAP_BOUNDS.w - 2} y={MAP_BOUNDS.y + MAP_BOUNDS.h + 15} textAnchor="end" fill={C.textDim} fontSize="8" fontFamily="JetBrains Mono, monospace" opacity="0.6">© Esri, HERE, Garmin</text>
+                    <text x={MAP_BOUNDS.x + MAP_BOUNDS.w - 2} y={MAP_BOUNDS.y + MAP_BOUNDS.h + 15} textAnchor="end" fill={C.textDim} fontSize="8" fontFamily="JetBrains Mono, monospace" opacity="0.6">© OpenStreetMap contributors</text>
                   </g>
 
                   {/* Data Center landmark */}
@@ -957,7 +967,7 @@
                             style={{ '--rBase': `${style.r + 6}px`, animation: 'pulseRing 1.6s ease-in-out infinite', transformOrigin: 'center', pointerEvents: 'none' }} />
                         )}
                         <circle cx={0} cy={0} r={style.r} fill={style.fill}
-                          stroke={inAudit ? C.gold : style.stroke} strokeWidth={inAudit ? 2.5 : 1.5}
+                          stroke={inAudit ? C.gold : style.stroke} strokeWidth={inAudit ? 3.0 : 2.5}
                           style={inAudit ? { animation: 'auditGlow 2s ease-in-out infinite' } : {}} />
                         {isPinned && (
                           <circle cx={style.r * 0.7} cy={-style.r * 0.7} r={3.5} fill={C.accent} stroke={C.bgPanel} strokeWidth={1.2} style={{ pointerEvents: 'none' }}>
@@ -1078,9 +1088,6 @@
             ))}
           </div>
 
-          <div className="mono" style={{ marginTop: '14px', fontSize: '10px', color: C.textDim, letterSpacing: '0.1em', textAlign: 'center' }}>
-            STAGE NOT THE PLAY · KERNEL WORDS BUILDING THEMSELVES
-          </div>
         </div>
       );
     }
