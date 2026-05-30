@@ -448,7 +448,10 @@
       const [beatIdx, setBeatIdx] = useState(0);
       const [autoPlay, setAutoPlay] = useState(false);
       const [showAuditOnly, setShowAuditOnly] = useState(false);
-      const [theme, setTheme] = useState('light');
+      const [theme, setTheme] = useState(() => {
+        const p = new URLSearchParams(window.location.search).get('mode');
+        return p === 'dark' || p === 'light' ? p : 'light';
+      });
       const [, setTick] = useState(0);
 
       const C = THEMES[theme];
