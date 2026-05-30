@@ -1,0 +1,6 @@
+cube_id,label,substation,region,firmware_version,hardware_serial,last_seen_at,status
+cube-001,cube-001,North Junction 115 kV,North-Central,v3.4.1,EW-25301,2026-05-30T14:23:08Z,ONLINE
+cube-002,cube-002,Cedar Hill 230 kV,South-East,v3.4.2,EW-37842,2026-05-30T14:23:08Z,ONLINE
+cube-003,cube-003,Riverbend 138 kV,West-Coast,v3.4.0,EW-61205,2026-05-30T14:23:08Z,ONLINE
+cube-004,cube-004,Eastgate 138 kV,Mountain-Pass,v3.3.7,EW-44788,2026-05-30T14:23:08Z,ONLINE
+cube-005,cube-005,Millrun 230 kV,North-Central,v3.4.1,EW-19234,2026-05-30T14:23:08Z,ONLINE

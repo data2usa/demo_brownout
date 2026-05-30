@@ -1,0 +1,2 @@
+approval_id,label,granted_by,granted_at,rationale,supersedes,authority
+appr-001,appr-001,dispatcher-42,2026-05-30T14:23:08Z,Evidence chain inspected; constraints honored,,GRID_DISPATCH_TIER_1

@@ -1,0 +1,444 @@
+{
+  "graphFilter": {
+    "labelFilters": [],
+    "propertyFilters": []
+  },
+  "steps": [
+    {
+      "type": "IngestStructured",
+      "schema": {
+        "indexes": [
+          { "label": "DataCube",          "properties": ["cube_id"],         "type": "default" },
+          { "label": "Disturbance",        "properties": ["disturbance_id"],  "type": "default" },
+          { "label": "Observation",        "properties": ["observation_id"],  "type": "default" },
+          { "label": "DisturbanceZone",    "properties": ["zone_id"],         "type": "default" },
+          { "label": "NegotiationRound",   "properties": ["round_id"],        "type": "default" },
+          { "label": "Contribution",       "properties": ["contribution_id"], "type": "default" },
+          { "label": "ConsensusProposal",  "properties": ["proposal_id"],     "type": "default" },
+          { "label": "ExecutionPlan",      "properties": ["plan_id"],         "type": "default" },
+          { "label": "Approval",           "properties": ["approval_id"],     "type": "default" },
+          { "label": "Operator",           "properties": ["operator_id"],     "type": "default" },
+          {
+            "labels": ["DataCube", "Disturbance", "DisturbanceZone", "Contribution", "ConsensusProposal", "ExecutionPlan", "Approval", "Operator"],
+            "properties": ["label", "substation", "region", "disturbance_source", "proposed_action", "rationale", "granted_by", "name", "role"],
+            "type": "fulltext",
+            "indexConfig": {
+              "fulltext.analyzer": "english",
+              "fulltext.eventually_consistent": true
+            }
+          },
+          {
+            "labels": ["Observation"],
+            "properties": ["tag", "label"],
+            "type": "fulltext",
+            "indexConfig": {
+              "fulltext.analyzer": "english",
+              "fulltext.eventually_consistent": true
+            }
+          }
+        ],
+        "constraints": [
+          { "label": "DataCube",         "type": "unique", "properties": ["cube_id"] },
+          { "label": "Disturbance",       "type": "unique", "properties": ["disturbance_id"] },
+          { "label": "Observation",       "type": "unique", "properties": ["observation_id"] },
+          { "label": "DisturbanceZone",   "type": "unique", "properties": ["zone_id"] },
+          { "label": "NegotiationRound",  "type": "unique", "properties": ["round_id"] },
+          { "label": "Contribution",      "type": "unique", "properties": ["contribution_id"] },
+          { "label": "ConsensusProposal", "type": "unique", "properties": ["proposal_id"] },
+          { "label": "ExecutionPlan",     "type": "unique", "properties": ["plan_id"] },
+          { "label": "Approval",          "type": "unique", "properties": ["approval_id"] },
+          { "label": "Operator",          "type": "unique", "properties": ["operator_id"] }
+        ]
+      },
+      "files": [
+        {
+          "path": "data/projects/necl_brownout/entities/data_cube.csv",
+          "mappings": [
+            {
+              "label": "DataCube",
+              "idField": "cube_id",
+              "properties": {
+                "cube_id":          "cube_id",
+                "label":            "label",
+                "substation":       "substation",
+                "region":           "region",
+                "firmware_version": "firmware_version",
+                "hardware_serial":  "hardware_serial",
+                "last_seen_at":     { "type": "datetime", "column": "last_seen_at" },
+                "status":           "status"
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/disturbance.csv",
+          "mappings": [
+            {
+              "label": "Disturbance",
+              "idField": "disturbance_id",
+              "properties": {
+                "disturbance_id":          "disturbance_id",
+                "label":                   "label",
+                "disturbance_class":       "disturbance_class",
+                "disturbance_source":      "disturbance_source",
+                "detected_at":             { "type": "datetime", "column": "detected_at" },
+                "severity":                "severity",
+                "estimated_magnitude_mw":  { "type": "float", "column": "estimated_magnitude_mw" },
+                "frequency_impact_hz":     { "type": "float", "column": "frequency_impact_hz" }
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/observation.csv",
+          "mappings": [
+            {
+              "label": "Observation",
+              "idField": "observation_id",
+              "properties": {
+                "observation_id": "observation_id",
+                "label":          "label",
+                "tag":            "tag",
+                "value":          { "type": "float", "column": "value" },
+                "baseline":       { "type": "float", "column": "baseline" },
+                "observed_at":    { "type": "datetime", "column": "observed_at" },
+                "confidence":     { "type": "float", "column": "confidence" }
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/disturbance_zone.csv",
+          "mappings": [
+            {
+              "label": "DisturbanceZone",
+              "idField": "zone_id",
+              "properties": {
+                "zone_id":                    "zone_id",
+                "label":                      "label",
+                "member_count":               { "type": "int",   "column": "member_count" },
+                "headroom_delta_mw":          { "type": "float", "column": "headroom_delta_mw" },
+                "voltage_deviation_max_pct":  { "type": "float", "column": "voltage_deviation_max_pct" },
+                "created_at":                 { "type": "datetime", "column": "created_at" },
+                "boundary_type":              "boundary_type"
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/negotiation_round.csv",
+          "mappings": [
+            {
+              "label": "NegotiationRound",
+              "idField": "round_id",
+              "properties": {
+                "round_id":           "round_id",
+                "label":              "label",
+                "started_at":         { "type": "datetime", "column": "started_at" },
+                "concluded_at":       { "type": "datetime", "column": "concluded_at" },
+                "contribution_count": { "type": "int",      "column": "contribution_count" },
+                "outcome":            "outcome",
+                "duration_ms":        { "type": "int",      "column": "duration_ms" }
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/contribution.csv",
+          "mappings": [
+            {
+              "label": "Contribution",
+              "idField": "contribution_id",
+              "properties": {
+                "contribution_id": "contribution_id",
+                "label":           "label",
+                "proposed_action": "proposed_action",
+                "rationale":       "rationale",
+                "outcome":         "outcome",
+                "submitted_at":    { "type": "datetime", "column": "submitted_at" }
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/consensus_proposal.csv",
+          "mappings": [
+            {
+              "label": "ConsensusProposal",
+              "idField": "proposal_id",
+              "properties": {
+                "proposal_id":               "proposal_id",
+                "label":                     "label",
+                "action_count":              { "type": "int",   "column": "action_count" },
+                "confidence":                "confidence",
+                "expected_freq_recovery_hz": { "type": "float", "column": "expected_freq_recovery_hz" },
+                "constraints_respected":     { "type": "int",   "column": "constraints_respected" },
+                "produced_at":               { "type": "datetime", "column": "produced_at" }
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/execution_plan.csv",
+          "mappings": [
+            {
+              "label": "ExecutionPlan",
+              "idField": "plan_id",
+              "properties": {
+                "plan_id":                    "plan_id",
+                "label":                      "label",
+                "plan_format":                "plan_format",
+                "dispatch_actions":           { "type": "int",   "column": "dispatch_actions" },
+                "expected_freq_recovery_hz":  { "type": "float", "column": "expected_freq_recovery_hz" },
+                "expected_headroom_mw":       { "type": "float", "column": "expected_headroom_mw" },
+                "estimated_execution_time_sec": { "type": "int", "column": "estimated_execution_time_sec" },
+                "rendered_at":                { "type": "datetime", "column": "rendered_at" }
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/approval.csv",
+          "mappings": [
+            {
+              "label": "Approval",
+              "idField": "approval_id",
+              "properties": {
+                "approval_id": "approval_id",
+                "label":       "label",
+                "granted_by":  "granted_by",
+                "granted_at":  { "type": "datetime", "column": "granted_at" },
+                "rationale":   "rationale",
+                "supersedes":  "supersedes",
+                "authority":   "authority"
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        },
+        {
+          "path": "data/projects/necl_brownout/entities/operator.csv",
+          "mappings": [
+            {
+              "label": "Operator",
+              "idField": "operator_id",
+              "properties": {
+                "operator_id":      "operator_id",
+                "label":            "label",
+                "name":             "name",
+                "role":             "role",
+                "certified_tier":   "certified_tier",
+                "shift_started_at": { "type": "datetime", "column": "shift_started_at" }
+              },
+              "staticProperties": {
+                "scenario":    { "type": "string", "value": "NECL_Brownout_v1.2" },
+                "node_kernel": { "type": "string", "value": "load-bearing" }
+              }
+            }
+          ]
+        }
+      ],
+      "relationships": [
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_datacube_datacube.csv",
+          "name": "INTER_CUBE_LINK",
+          "startLabel": "DataCube",
+          "startSourceField": "source_cube_id",
+          "startNodeProperty": "cube_id",
+          "endLabel": "DataCube",
+          "endSourceField": "target_cube_id",
+          "endNodeProperty": "cube_id",
+          "properties": {
+            "link_id":     "link_id",
+            "link_status": "link_status"
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_observation_datacube.csv",
+          "name": "OBSERVED_BY",
+          "startLabel": "Observation",
+          "startSourceField": "observation_id",
+          "startNodeProperty": "observation_id",
+          "endLabel": "DataCube",
+          "endSourceField": "cube_id",
+          "endNodeProperty": "cube_id",
+          "properties": {
+            "observed_at": { "type": "datetime", "column": "observed_at" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_observation_disturbance.csv",
+          "name": "CONTRIBUTES_TO",
+          "startLabel": "Observation",
+          "startSourceField": "observation_id",
+          "startNodeProperty": "observation_id",
+          "endLabel": "Disturbance",
+          "endSourceField": "disturbance_id",
+          "endNodeProperty": "disturbance_id",
+          "properties": {
+            "contribution_type": "contribution_type"
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_disturbancezone_datacube.csv",
+          "name": "INCLUDES",
+          "startLabel": "DisturbanceZone",
+          "startSourceField": "zone_id",
+          "startNodeProperty": "zone_id",
+          "endLabel": "DataCube",
+          "endSourceField": "cube_id",
+          "endNodeProperty": "cube_id",
+          "properties": {
+            "member_since": { "type": "datetime", "column": "member_since" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_disturbance_disturbancezone.csv",
+          "name": "OCCURS_IN",
+          "startLabel": "Disturbance",
+          "startSourceField": "disturbance_id",
+          "startNodeProperty": "disturbance_id",
+          "endLabel": "DisturbanceZone",
+          "endSourceField": "zone_id",
+          "endNodeProperty": "zone_id",
+          "properties": {
+            "detected_at": { "type": "datetime", "column": "detected_at" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_datacube_contribution.csv",
+          "name": "CONTRIBUTED",
+          "startLabel": "DataCube",
+          "startSourceField": "cube_id",
+          "startNodeProperty": "cube_id",
+          "endLabel": "Contribution",
+          "endSourceField": "contribution_id",
+          "endNodeProperty": "contribution_id",
+          "properties": {
+            "contributed_at": { "type": "datetime", "column": "contributed_at" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_contribution_negotiationround.csv",
+          "name": "IN_ROUND",
+          "startLabel": "Contribution",
+          "startSourceField": "contribution_id",
+          "startNodeProperty": "contribution_id",
+          "endLabel": "NegotiationRound",
+          "endSourceField": "round_id",
+          "endNodeProperty": "round_id",
+          "properties": {
+            "submission_sequence": { "type": "int", "column": "submission_sequence" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_consensusproposal_negotiationround.csv",
+          "name": "DERIVED_FROM",
+          "startLabel": "ConsensusProposal",
+          "startSourceField": "proposal_id",
+          "startNodeProperty": "proposal_id",
+          "endLabel": "NegotiationRound",
+          "endSourceField": "round_id",
+          "endNodeProperty": "round_id",
+          "properties": {
+            "derived_at": { "type": "datetime", "column": "derived_at" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_consensusproposal_observation.csv",
+          "name": "JUSTIFIED_BY",
+          "startLabel": "ConsensusProposal",
+          "startSourceField": "proposal_id",
+          "startNodeProperty": "proposal_id",
+          "endLabel": "Observation",
+          "endSourceField": "observation_id",
+          "endNodeProperty": "observation_id",
+          "properties": {
+            "evidence_type": "evidence_type"
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_executionplan_consensusproposal.csv",
+          "name": "RENDERS",
+          "startLabel": "ExecutionPlan",
+          "startSourceField": "plan_id",
+          "startNodeProperty": "plan_id",
+          "endLabel": "ConsensusProposal",
+          "endSourceField": "proposal_id",
+          "endNodeProperty": "proposal_id",
+          "properties": {
+            "rendered_at": { "type": "datetime", "column": "rendered_at" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_operator_approval.csv",
+          "name": "GRANTED",
+          "startLabel": "Operator",
+          "startSourceField": "operator_id",
+          "startNodeProperty": "operator_id",
+          "endLabel": "Approval",
+          "endSourceField": "approval_id",
+          "endNodeProperty": "approval_id",
+          "properties": {
+            "granted_at": { "type": "datetime", "column": "granted_at" }
+          }
+        },
+        {
+          "path": "data/projects/necl_brownout/relationships/REL_approval_executionplan.csv",
+          "name": "APPROVES",
+          "startLabel": "Approval",
+          "startSourceField": "approval_id",
+          "startNodeProperty": "approval_id",
+          "endLabel": "ExecutionPlan",
+          "endSourceField": "plan_id",
+          "endNodeProperty": "plan_id",
+          "properties": {
+            "approved_at": { "type": "datetime", "column": "approved_at" }
+          }
+        }
+      ],
+      "options": {
+        "mergeNodes": true,
+        "onDuplicate": "update",
+        "batchSize": 1000,
+        "vectorize": true,
+        "encoding": "utf-8"
+      }
+    }
+  ]
+}

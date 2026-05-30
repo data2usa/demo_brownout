@@ -1,0 +1,2 @@
+zone_id,label,member_count,headroom_delta_mw,voltage_deviation_max_pct,created_at,boundary_type
+zone-001,zone-001,3,180.0,3.0,2026-05-30T14:22:04Z,node-bounded

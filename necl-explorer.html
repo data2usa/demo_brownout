@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NECL Scenario Explorer · The Brownout</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/d3@7/dist/d3.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { overflow-x: hidden; }
+    #root { min-height: 100vh; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo, useRef } = React;
+
+    // ============================================================
+    // NECL Scenario Explorer — Brownout (force-directed)
+    // Graph builds itself live. Layout via d3-force.
+    // ============================================================
+
+    // ---------- Themes ----------
+    const THEMES = {
+      dark: {
+        bg:        '#0E1410',
+        bgPanel:   '#161D18',
+        bgSubtle:  '#1C2520',
+        border:    '#2A3530',
+        borderHi:  '#3D4A43',
+        gridLine:  '#2A3530',
+        text:      '#E5EDE6',
+        textMuted: '#8FA098',
+        textDim:   '#5A6862',
+        accent:    '#7FB069',
+        accentDim: '#4A6B3F',
+        warn:      '#E07A3C',
+        warnDim:   '#8C4A24',
+        cyan:      '#5BA8B5',
+        gold:      '#D4AF5A',
+        nodeFill: {
+          DataCube:          '#4A6B3F',
+          Disturbance:       '#8C4A24',
+          Observation:       '#1F3137',
+          DisturbanceZone:   '#3A2818',
+          NegotiationRound:  '#2A2418',
+          Contribution:      '#1F1B14',
+          ConsensusProposal: '#1A2A2D',
+          ExecutionPlan:     '#1F2A26',
+          Approval:          '#2A2418',
+          Operator:          '#1F1F1F',
+        },
+        mapBg:        '#121814',
+        mapTerrain:   '#1A211D',
+        mapContour:   '#22302A',
+        transmission: '#3D5048',
+        laneBg:       '#13191A',
+        laneSep:      '#2A3530',
+        dataCenter:   '#9A4F1F',
+      },
+      light: {
+        bg:        '#F4F1EA',
+        bgPanel:   '#FBF9F3',
+        bgSubtle:  '#EFEBE0',
+        border:    '#D6CFBE',
+        borderHi:  '#B8AE96',
+        gridLine:  '#E2DCCB',
+        text:      '#2A2A26',
+        textMuted: '#6B6757',
+        textDim:   '#9A9484',
+        accent:    '#3F6B2F',
+        accentDim: '#A8C58F',
+        warn:      '#B8531F',
+        warnDim:   '#E8B89E',
+        cyan:      '#2F6B78',
+        gold:      '#9A7A1F',
+        nodeFill: {
+          DataCube:          '#DCE8CE',
+          Disturbance:       '#F2D4BF',
+          Observation:       '#D4E2E5',
+          DisturbanceZone:   '#F0DFCB',
+          NegotiationRound:  '#EFE4C7',
+          Contribution:      '#F4ECD2',
+          ConsensusProposal: '#CCDDE0',
+          ExecutionPlan:     '#D4E0D2',
+          Approval:          '#EFE4C7',
+          Operator:          '#E6E3DA',
+        },
+        mapBg:        '#EEEAD9',
+        mapTerrain:   '#E5E0CB',
+        mapContour:   '#D6CFBA',
+        transmission: '#9A8E70',
+        laneBg:       '#EFEBE0',
+        laneSep:      '#C8BFA8',
+        dataCenter:   '#B8531F',
+      },
+    };
+
+    const MAP_BOUNDS = { x: 30, y: 30, w: 880, h: 660 };
+    const LANE_X = 950;
+
+    const PLACES = {
+      c1: { x: 230, y: 290, name: 'North Junction 115 kV' },
+      c2: { x: 460, y: 200, name: 'Cedar Hill 230 kV' },
+      c3: { x: 660, y: 290, name: 'Riverbend 138 kV' },
+      c4: { x: 700, y: 440, name: 'Eastgate 138 kV' },
+      c5: { x: 410, y: 530, name: 'Millrun 230 kV' },
+      dataCenter: { x: 800, y: 130, name: 'Data Center · Site Z' },
+      d1: { x: 770, y: 170 },
+      z1: { x: 600, y: 310 },
+      o1: { x: 660, y: 230 },
+      o2: { x: 760, y: 460 },
+      o3: { x: 460, y: 140 },
+    };
+
+    const LANE_POS = {
+      nr:  { x: 1100, y: 380 },
+      nc2: { x: 1010, y: 290 },
+      nc3: { x: 1110, y: 290 },
+      nc4: { x: 1210, y: 290 },
+      cp:  { x: 1200, y: 460 },
+      ep:  { x: 1100, y: 540 },
+      ap:  { x: 1230, y: 620 },
+      op:  { x: 1330, y: 580 },
+    };
+
+    const BEATS = [
+      {
+        title: 'Idle mesh',
+        subtitle: 'The grid is stable. Cubes are observing, links are nominal.',
+        operatorView: 'No disturbance detected. Five DataCubes monitoring the regional grid. All InterCubeLinks healthy.',
+        addNodes: [
+          { id: 'c1', kind: 'DataCube', label: 'cube-001', placeId: 'c1' },
+          { id: 'c2', kind: 'DataCube', label: 'cube-002', placeId: 'c2' },
+          { id: 'c3', kind: 'DataCube', label: 'cube-003', placeId: 'c3' },
+          { id: 'c4', kind: 'DataCube', label: 'cube-004', placeId: 'c4' },
+          { id: 'c5', kind: 'DataCube', label: 'cube-005', placeId: 'c5' },
+        ],
+        addEdges: [
+          { id: 'l12', source: 'c1', target: 'c2', kind: 'InterCubeLink' },
+          { id: 'l23', source: 'c2', target: 'c3', kind: 'InterCubeLink' },
+          { id: 'l24', source: 'c2', target: 'c4', kind: 'InterCubeLink' },
+          { id: 'l34', source: 'c3', target: 'c4', kind: 'InterCubeLink' },
+          { id: 'l14', source: 'c1', target: 'c4', kind: 'InterCubeLink' },
+          { id: 'l45', source: 'c4', target: 'c5', kind: 'InterCubeLink' },
+          { id: 'l15', source: 'c1', target: 'c5', kind: 'InterCubeLink' },
+        ],
+      },
+      {
+        title: 'Disturbance',
+        subtitle: 'A data center throws its main switch. Massive unannounced load.',
+        operatorView: 'Anomaly detected. Sudden +180 MW load near cube-003 at Riverbend substation. Frequency excursion observed; voltage sag propagating across the local grid.',
+        narrative: 'A LoadEvent occurs near the data center — a Disturbance node enters the graph. This is the trigger.',
+        addNodes: [
+          { id: 'd1', kind: 'Disturbance', label: 'LoadEvent', pulse: true, placeId: 'd1' },
+        ],
+      },
+      {
+        title: 'Observations',
+        subtitle: 'Nearby cubes record local readings. No cube has the full picture yet.',
+        operatorView: 'cube-003: GenP delta -45 MW. cube-004: voltage sag 3%. cube-002: frequency dip 0.08 Hz. All readings timestamped and persisted to the local Memgraph.',
+        narrative: 'Each affected DataCube produces an Observation node. Edges link observations back to the cubes that captured them.',
+        addNodes: [
+          { id: 'o1', kind: 'Observation', label: 'GenP',  placeId: 'o1' },
+          { id: 'o2', kind: 'Observation', label: 'V-sag', placeId: 'o2' },
+          { id: 'o3', kind: 'Observation', label: 'freq',  placeId: 'o3' },
+        ],
+        addEdges: [
+          { id: 'eo1',  source: 'o1', target: 'c3', kind: 'OBSERVED_BY' },
+          { id: 'eo2',  source: 'o2', target: 'c4', kind: 'OBSERVED_BY' },
+          { id: 'eo3',  source: 'o3', target: 'c2', kind: 'OBSERVED_BY' },
+          { id: 'eo1d', source: 'o1', target: 'd1', kind: 'CONTRIBUTES_TO' },
+          { id: 'eo2d', source: 'o2', target: 'd1', kind: 'CONTRIBUTES_TO' },
+          { id: 'eo3d', source: 'o3', target: 'd1', kind: 'CONTRIBUTES_TO' },
+        ],
+      },
+      {
+        title: 'Disturbance zone',
+        subtitle: 'Cubes feeling the disturbance form a coherent zone.',
+        operatorView: 'DisturbanceZone formed. Members: cube-002 (Cedar Hill), cube-003 (Riverbend), cube-004 (Eastgate). HeadroomDelta across zone: -180 MW. Zone bounded by reporting cubes.',
+        narrative: 'A DisturbanceZone node connects the cubes whose observations deviated from baseline. The "where" of the event is now first-class — and visible on the map as a halo around the affected substations.',
+        addNodes: [
+          { id: 'z1', kind: 'DisturbanceZone', label: 'zone-001', placeId: 'z1' },
+        ],
+        addEdges: [
+          { id: 'ez1', source: 'z1', target: 'c2', kind: 'INCLUDES' },
+          { id: 'ez2', source: 'z1', target: 'c3', kind: 'INCLUDES' },
+          { id: 'ez3', source: 'z1', target: 'c4', kind: 'INCLUDES' },
+          { id: 'ezd', source: 'd1', target: 'z1', kind: 'OCCURS_IN' },
+        ],
+      },
+      {
+        title: 'Negotiation',
+        subtitle: 'The cubes call each other. The conversation is recorded.',
+        operatorView: 'NegotiationRound opened. Three contributions received: cube-002 proposes ramping gen-12 by 60 MW; cube-003 proposes splitting load across gen-12 and gen-15; cube-004 flags binding thermal constraint on line L-22.',
+        narrative: 'A NegotiationRound is created in the decision lane — and crucially, each cube contributes its own NegotiationContribution node. Every voice in the room is captured.',
+        addNodes: [
+          { id: 'nr',  kind: 'NegotiationRound', label: 'round-001', lanePos: 'nr' },
+          { id: 'nc2', kind: 'Contribution',     label: 'c-002',     lanePos: 'nc2' },
+          { id: 'nc3', kind: 'Contribution',     label: 'c-003',     lanePos: 'nc3' },
+          { id: 'nc4', kind: 'Contribution',     label: 'c-004',     lanePos: 'nc4' },
+        ],
+        addEdges: [
+          { id: 'enc2',  source: 'c2',  target: 'nc2', kind: 'CONTRIBUTED' },
+          { id: 'enc3',  source: 'c3',  target: 'nc3', kind: 'CONTRIBUTED' },
+          { id: 'enc4',  source: 'c4',  target: 'nc4', kind: 'CONTRIBUTED' },
+          { id: 'enc2r', source: 'nc2', target: 'nr',  kind: 'IN_ROUND' },
+          { id: 'enc3r', source: 'nc3', target: 'nr',  kind: 'IN_ROUND' },
+          { id: 'enc4r', source: 'nc4', target: 'nr',  kind: 'IN_ROUND' },
+        ],
+      },
+      {
+        title: 'Consensus',
+        subtitle: 'The cubes converge on a shared proposal.',
+        operatorView: "ConsensusProposal derived: ramp gen-12 by 40 MW, ramp gen-15 by 20 MW, hold line L-22 below 90% loading. cube-003's proposal accepted; cube-004's constraint respected; cube-002's proposal partially adopted.",
+        narrative: 'A ConsensusProposal node is derived from the round, with edges to the supporting Observations as evidence.',
+        addNodes: [
+          { id: 'cp', kind: 'ConsensusProposal', label: 'prop-001', lanePos: 'cp' },
+        ],
+        addEdges: [
+          { id: 'ecp',   source: 'cp', target: 'nr', kind: 'DERIVED_FROM' },
+          { id: 'ecpe1', source: 'cp', target: 'o1', kind: 'JUSTIFIED_BY' },
+          { id: 'ecpe2', source: 'cp', target: 'o2', kind: 'JUSTIFIED_BY' },
+        ],
+      },
+      {
+        title: 'Execution plan',
+        subtitle: 'The proposal becomes a single document for human review.',
+        operatorView: 'ExecutionPlan rendered. Contains 3 DispatchActions, full evidence chain, expected post-execution state. Awaiting operator review.',
+        narrative: 'An ExecutionPlan node renders the proposal in a form a human can sign. This is the gate.',
+        addNodes: [
+          { id: 'ep', kind: 'ExecutionPlan', label: 'plan-001', lanePos: 'ep' },
+        ],
+        addEdges: [
+          { id: 'eep', source: 'ep', target: 'cp', kind: 'RENDERS' },
+        ],
+      },
+      {
+        title: 'Approval',
+        subtitle: 'Dispatcher reviews and signs.',
+        operatorView: 'Plan reviewed by dispatcher-42. Evidence chain inspected. Approval granted at 14:23:08. Plan released to grid SCADA.',
+        narrative: 'An Approval node — connected to a human Operator — gates execution. The plan is now authoritative.',
+        addNodes: [
+          { id: 'op', kind: 'Operator',  label: 'disp-42',  lanePos: 'op' },
+          { id: 'ap', kind: 'Approval',  label: 'appr-001', lanePos: 'ap' },
+        ],
+        addEdges: [
+          { id: 'eap',  source: 'op', target: 'ap', kind: 'GRANTED' },
+          { id: 'eapp', source: 'ap', target: 'ep', kind: 'APPROVES' },
+        ],
+      },
+      {
+        title: 'Audit chain',
+        subtitle: 'Every node and edge is now part of a permanent record.',
+        operatorView: 'AuditChain materialized. End-to-end traversal: Observation → Contribution → NegotiationRound → ConsensusProposal → ExecutionPlan → Approval. Append-only. Replayable years from now.',
+        narrative: 'The AuditChain is not a stored entity — it is the path through this graph. Trace it with your eye, or with a single Cypher query. The chain spans both the geographic mesh (left) and the decision lane (right).',
+        auditChain: ['o1', 'eo1d', 'd1', 'ezd', 'z1', 'ez2', 'c3', 'enc3', 'nc3', 'enc3r', 'nr', 'ecp', 'cp', 'eep', 'ep', 'eapp', 'ap', 'eap', 'op'],
+      },
+    ];
+
+    const nodeStyles = (C) => ({
+      DataCube:           { fill: C.nodeFill.DataCube,          stroke: C.accent, glyph: '◆', r: 22 },
+      Disturbance:        { fill: C.nodeFill.Disturbance,       stroke: C.warn,   glyph: '▲', r: 22 },
+      Observation:        { fill: C.nodeFill.Observation,       stroke: C.cyan,   glyph: '○', r: 16 },
+      DisturbanceZone:    { fill: C.nodeFill.DisturbanceZone,   stroke: C.warn,   glyph: '◇', r: 24 },
+      NegotiationRound:   { fill: C.nodeFill.NegotiationRound,  stroke: C.gold,   glyph: '◉', r: 22 },
+      Contribution:       { fill: C.nodeFill.Contribution,      stroke: C.gold,   glyph: '◎', r: 14 },
+      ConsensusProposal:  { fill: C.nodeFill.ConsensusProposal, stroke: C.cyan,   glyph: '⬢', r: 22 },
+      ExecutionPlan:      { fill: C.nodeFill.ExecutionPlan,     stroke: C.accent, glyph: '▣', r: 22 },
+      Approval:           { fill: C.nodeFill.Approval,          stroke: C.gold,   glyph: '✓', r: 22 },
+      Operator:           { fill: C.nodeFill.Operator,          stroke: C.text,   glyph: '☉', r: 22 },
+    });
+
+    const VIEW_W = 1400;
+    const VIEW_H = 720;
+
+    function hashSeed(id) {
+      let h = 0;
+      for (let i = 0; i < id.length; i++) h = ((h << 5) - h) + id.charCodeAt(i);
+      return Math.abs(h);
+    }
+    function pick(id, salt, arr) {
+      return arr[(hashSeed(id) + salt) % arr.length];
+    }
+
+    const KIND_META = {
+      DataCube: {
+        kernel: 'load-bearing',
+        inMission: 'A grid edge node deployed at a substation. Monitors local power flow, voltage, and frequency. Holds a local Memgraph logbook so it keeps observing even if comms to the control center drop.',
+        kernelNote: 'Universally — a ruggedized field unit with hardware identity and a local logbook. The mission decides what it monitors.',
+        props: (n) => [
+          ['id', n.id],
+          ['substation', pick(n.id, 1, ['Riverbend 138 kV', 'Cedar Hill 230 kV', 'North Junction 115 kV', 'Eastgate 138 kV', 'Millrun 230 kV'])],
+          ['region', pick(n.id, 2, ['North-Central', 'South-East', 'West-Coast', 'Mountain-Pass'])],
+          ['firmwareVersion', `v${pick(n.id, 3, ['3.4.1', '3.4.2', '3.4.0', '3.3.7'])}`],
+          ['hardwareSerial', `EW-${(hashSeed(n.id) % 90000 + 10000)}`],
+          ['lastSeenAt', '14:23:08 UTC'],
+          ['status', 'ONLINE'],
+        ],
+      },
+      Disturbance: {
+        kernel: 'load-bearing',
+        inMission: 'A LoadEvent — an unannounced demand spike from a data center coming online. The grid feels it as a sudden draw the dispatch model did not plan for.',
+        kernelNote: 'Universally — anything that perturbs the mesh. In other missions this could be RF interference, a methane plume, a pressure spike.',
+        props: (n) => [
+          ['id', n.id],
+          ['class', 'load_event'],
+          ['source', 'data_center · unannounced'],
+          ['detectedAt', '14:21:55 UTC'],
+          ['severity', 'HIGH'],
+          ['estimatedMagnitude', '+180 MW'],
+          ['frequencyImpact', '-0.08 Hz'],
+        ],
+      },
+      Observation: {
+        kernel: 'load-bearing',
+        inMission: 'A timestamped telemetry reading from a substation sensor — MW, voltage, or frequency. Each Observation is a graph node, not a row in a time-series table, so it can be linked back to the cube that captured it and the disturbance it contributed to.',
+        kernelNote: 'Universally — a single timestamped reading with provenance.',
+        props: (n) => {
+          const tags = { o1: 'SensorPower_GenP.MW', o2: 'SensorPower_V.pu', o3: 'SensorFreq.Hz' };
+          const vals = { o1: '287.4', o2: '0.973', o3: '59.92' };
+          const baselines = { o1: '332.1', o2: '1.002', o3: '60.00' };
+          return [
+            ['id', n.id],
+            ['tag', tags[n.id] || 'Sensor.unknown'],
+            ['value', vals[n.id] || '0.0'],
+            ['baseline', baselines[n.id] || '—'],
+            ['at', '14:22:01.318 UTC'],
+            ['confidence', '0.97'],
+          ];
+        },
+      },
+      DisturbanceZone: {
+        kernel: 'load-bearing',
+        inMission: 'The set of substations and feeders feeling the load shock. Bounded by which cubes are reporting deviations from baseline, not by predefined geography.',
+        kernelNote: 'Universally — the region of the mesh affected by a Disturbance. Can be node-bounded (cubes) or edge-bounded (links).',
+        props: (n) => [
+          ['id', n.id],
+          ['memberCount', '3 substations'],
+          ['headroomDelta', '-180 MW'],
+          ['voltageDeviationMax', '3.0%'],
+          ['createdAt', '14:22:04 UTC'],
+          ['boundary', 'node-bounded'],
+        ],
+      },
+      NegotiationRound: {
+        kernel: 'load-bearing',
+        inMission: 'The coordination round where affected substations propose dispatch responses to each other before any plan is sent up the chain. Each cube knows local constraints; together they find a feasible solution.',
+        kernelNote: 'Universally — one round of cube-to-cube coordination. Recorded as a subgraph so every contribution is queryable later.',
+        props: (n) => [
+          ['id', n.id],
+          ['startedAt', '14:22:11 UTC'],
+          ['concludedAt', '14:22:14 UTC'],
+          ['contributionCount', '3'],
+          ['outcome', 'CONSENSUS_REACHED'],
+          ['durationMs', '2840'],
+        ],
+      },
+      Contribution: {
+        kernel: 'load-bearing',
+        inMission: "One substation cube's proposed dispatch action. Could be a generation ramp, a reactive support adjustment, or a flag of a binding constraint that limits the others' options.",
+        kernelNote: 'Universally — one cube\'s input to a NegotiationRound. Forensically queryable: "which cube was overruled, and how often?"',
+        props: (n) => {
+          const proposals = {
+            nc2: 'Ramp gen-12 by +60 MW',
+            nc3: 'Split load: gen-12 +40 MW, gen-15 +20 MW',
+            nc4: 'Hold line L-22 below 90% thermal limit',
+          };
+          const accepts = { nc2: 'PARTIALLY_ADOPTED', nc3: 'ADOPTED', nc4: 'CONSTRAINT_HONORED' };
+          const rationales = {
+            nc2: 'gen-12 has fastest ramp rate in zone',
+            nc3: 'Splitting reduces single-asset stress; preserves reserve',
+            nc4: 'Line L-22 already at 87% — single-contingency at risk',
+          };
+          return [
+            ['id', n.id],
+            ['proposedAction', proposals[n.id] || '—'],
+            ['rationale', rationales[n.id] || '—'],
+            ['outcome', accepts[n.id] || 'PENDING'],
+            ['submittedAt', '14:22:12 UTC'],
+          ];
+        },
+      },
+      ConsensusProposal: {
+        kernel: 'load-bearing',
+        inMission: 'The agreed dispatch reconfiguration. A coherent plan that every participating cube is willing to sign off on — respects all binding constraints, redistributes the load shock, restores frequency.',
+        kernelNote: 'Universally — the collective conclusion of one or more NegotiationRounds.',
+        props: (n) => [
+          ['id', n.id],
+          ['actionCount', '3 dispatch actions'],
+          ['confidence', 'HIGH'],
+          ['expectedFreqRecovery', '+0.07 Hz'],
+          ['constraintsRespected', '4 / 4'],
+          ['producedAt', '14:22:14 UTC'],
+        ],
+      },
+      ExecutionPlan: {
+        kernel: 'load-bearing',
+        inMission: 'The dispatch order document — formatted for a human grid operator to read, evaluate, and sign. Bundles the proposed actions, the supporting telemetry evidence, and the negotiation history into one approvable package.',
+        kernelNote: 'Universally — a human-reviewable rendering of a ConsensusProposal. The unit of human approval.',
+        props: (n) => [
+          ['id', n.id],
+          ['format', 'human-reviewable'],
+          ['dispatchActions', '3'],
+          ['expectedFreqRecovery', '+0.07 Hz'],
+          ['expectedHeadroom', '+180 MW'],
+          ['estimatedExecutionTime', '~12 sec'],
+          ['renderedAt', '14:22:15 UTC'],
+        ],
+      },
+      Approval: {
+        kernel: 'load-bearing',
+        inMission: "The grid dispatcher's sign-off releasing the plan to SCADA. Has its own identity in the graph so it can be audited, revoked, or amended later — and so an automation envelope can be a first-class pre-approval.",
+        kernelNote: 'Universally — the human gate on the consensus. Modeled as a node so approvals carry their own lineage.',
+        props: (n) => [
+          ['id', n.id],
+          ['grantedBy', 'dispatcher-42'],
+          ['grantedAt', '14:23:08 UTC'],
+          ['rationale', 'Evidence chain inspected; constraints honored'],
+          ['supersedes', '—'],
+          ['authority', 'GRID_DISPATCH_TIER_1'],
+        ],
+      },
+      Operator: {
+        kernel: 'load-bearing',
+        inMission: 'A certified grid dispatcher on shift. The human in the audit chain — the one whose signature releases dispatch orders to SCADA.',
+        kernelNote: 'Universally — a human actor with authority. Every Approval has an Operator behind it.',
+        props: (n) => [
+          ['id', n.id],
+          ['name', 'M. Chen'],
+          ['role', 'Senior Grid Dispatcher'],
+          ['certifiedTier', 'GRID_DISPATCH_TIER_1'],
+          ['shiftStartedAt', '08:00 UTC'],
+        ],
+      },
+    };
+
+    function NECLExplorer() {
+      const [beatIdx, setBeatIdx] = useState(0);
+      const [autoPlay, setAutoPlay] = useState(false);
+      const [showAuditOnly, setShowAuditOnly] = useState(false);
+      const [theme, setTheme] = useState('dark');
+      const [, setTick] = useState(0);
+
+      const C = THEMES[theme];
+      const NODE_STYLE = useMemo(() => nodeStyles(C), [theme]);
+
+      const svgRef = useRef(null);
+      const zoomGroupRef = useRef(null);
+      const simRef = useRef(null);
+      const nodesRef = useRef([]);
+      const edgesRef = useRef([]);
+      const newNodeIdsRef = useRef(new Set());
+      const newEdgeIdsRef = useRef(new Set());
+      const zoomBehaviorRef = useRef(null);
+      const [zoomLevel, setZoomLevel] = useState(1);
+      const [selectedId, setSelectedId] = useState(null);
+
+      useEffect(() => {
+        const sim = d3.forceSimulation([])
+          .force('link', d3.forceLink([]).id(d => d.id).distance(d => {
+            if (d.kind === 'InterCubeLink') return 110;
+            if (d.kind === 'CONTRIBUTES_TO') return 70;
+            if (d.kind === 'OBSERVED_BY') return 55;
+            if (d.kind === 'INCLUDES') return 90;
+            if (d.kind === 'IN_ROUND') return 60;
+            if (d.kind === 'CONTRIBUTED') return 75;
+            return 85;
+          }).strength(0.3))
+          .force('charge', d3.forceManyBody().strength(d => {
+            const s = NODE_STYLE[d.kind];
+            return -((s?.r || 18) * 8);
+          }))
+          .force('collide', d3.forceCollide().radius(d => (NODE_STYLE[d.kind]?.r || 18) + 8))
+          .alphaDecay(0.04)
+          .velocityDecay(0.5)
+          .on('tick', () => setTick(t => t + 1));
+
+        simRef.current = sim;
+        return () => sim.stop();
+      }, []);
+
+      useEffect(() => {
+        const svg = svgRef.current;
+        const zoomGroup = zoomGroupRef.current;
+        if (!svg || !zoomGroup) return;
+
+        const svgSel = d3.select(svg);
+        const groupSel = d3.select(zoomGroup);
+
+        const zoom = d3.zoom()
+          .scaleExtent([0.3, 3])
+          .filter((event) => {
+            if (event.type === 'wheel') return true;
+            if (event.button) return false;
+            return true;
+          })
+          .on('zoom', (event) => {
+            groupSel.attr('transform', event.transform.toString());
+            setZoomLevel(event.transform.k);
+          });
+
+        zoomBehaviorRef.current = zoom;
+        svgSel.call(zoom);
+        svgSel.on('dblclick.zoom', null);
+
+        return () => { svgSel.on('.zoom', null); };
+      }, []);
+
+      useEffect(() => {
+        const zoomGroup = zoomGroupRef.current;
+        if (!zoomGroup) return;
+
+        let dragStartXY = null;
+        let didMove = false;
+
+        const drag = d3.drag()
+          .on('start', function(event) {
+            const id = this.getAttribute('data-id');
+            const d = nodesRef.current.find(n => n.id === id);
+            if (!d) return;
+            dragStartXY = [event.x, event.y];
+            didMove = false;
+            if (!event.active) simRef.current?.alphaTarget(0.3).restart();
+          })
+          .on('drag', function(event) {
+            const id = this.getAttribute('data-id');
+            const d = nodesRef.current.find(n => n.id === id);
+            if (!d) return;
+            if (!didMove && dragStartXY) {
+              const dx = event.x - dragStartXY[0];
+              const dy = event.y - dragStartXY[1];
+              if (Math.hypot(dx, dy) > 3) {
+                didMove = true;
+                d.fx = d.x;
+                d.fy = d.y;
+              }
+            }
+            if (didMove) {
+              d.fx = Math.max(40, Math.min(VIEW_W - 40, event.x));
+              d.fy = Math.max(40, Math.min(VIEW_H - 40, event.y));
+            }
+          })
+          .on('end', function(event) {
+            if (!event.active) simRef.current?.alphaTarget(0);
+            const id = this.getAttribute('data-id');
+            if (!didMove) {
+              setSelectedId(prev => prev === id ? null : id);
+            }
+            dragStartXY = null;
+          });
+
+        d3.select(zoomGroup).selectAll('g.node-group').call(drag);
+      });
+
+      const handleNodeDoubleClick = (e, node) => {
+        e.stopPropagation();
+        node.fx = null;
+        node.fy = null;
+        simRef.current?.alpha(0.4).restart();
+      };
+
+      const zoomBy = (factor) => {
+        if (!svgRef.current || !zoomBehaviorRef.current) return;
+        d3.select(svgRef.current).transition().duration(220)
+          .call(zoomBehaviorRef.current.scaleBy, factor);
+      };
+      const resetZoom = () => {
+        if (!svgRef.current || !zoomBehaviorRef.current) return;
+        d3.select(svgRef.current).transition().duration(300)
+          .call(zoomBehaviorRef.current.transform, d3.zoomIdentity);
+      };
+
+      useEffect(() => {
+        if (!simRef.current) return;
+
+        const wantedNodes = new Map();
+        const wantedEdges = new Map();
+        const newNodeIds = new Set();
+        const newEdgeIds = new Set();
+
+        for (let i = 0; i <= beatIdx; i++) {
+          const b = BEATS[i];
+          (b.addNodes || []).forEach(n => {
+            wantedNodes.set(n.id, { ...n, beatIntroduced: i });
+            if (i === beatIdx) newNodeIds.add(n.id);
+          });
+          (b.addEdges || []).forEach(e => {
+            wantedEdges.set(e.id, { ...e, beatIntroduced: i });
+            if (i === beatIdx) newEdgeIds.add(e.id);
+          });
+        }
+
+        const existingById = new Map(nodesRef.current.map(n => [n.id, n]));
+        const merged = [];
+        wantedNodes.forEach((wantedNode, id) => {
+          let pinX = null, pinY = null;
+          if (wantedNode.placeId && PLACES[wantedNode.placeId]) {
+            pinX = PLACES[wantedNode.placeId].x;
+            pinY = PLACES[wantedNode.placeId].y;
+          } else if (wantedNode.lanePos && LANE_POS[wantedNode.lanePos]) {
+            pinX = LANE_POS[wantedNode.lanePos].x;
+            pinY = LANE_POS[wantedNode.lanePos].y;
+          }
+
+          const existing = existingById.get(id);
+          if (existing) {
+            const wasUserDragged = existing.fx != null && (
+              (PLACES[existing.placeId] && (Math.abs(existing.fx - PLACES[existing.placeId].x) > 1 || Math.abs(existing.fy - PLACES[existing.placeId].y) > 1)) ||
+              (LANE_POS[existing.lanePos] && (Math.abs(existing.fx - LANE_POS[existing.lanePos].x) > 1 || Math.abs(existing.fy - LANE_POS[existing.lanePos].y) > 1))
+            );
+            Object.assign(existing, { ...wantedNode, x: existing.x, y: existing.y, vx: existing.vx, vy: existing.vy });
+            if (!wasUserDragged && pinX != null) {
+              existing.fx = pinX;
+              existing.fy = pinY;
+            }
+            merged.push(existing);
+          } else {
+            let seedX = pinX != null ? pinX : (LANE_X + 100 + (Math.random() - 0.5) * 60);
+            let seedY = pinY != null ? pinY : (VIEW_H / 2 + (Math.random() - 0.5) * 60);
+            const newNode = { ...wantedNode, x: seedX, y: seedY };
+            if (pinX != null) { newNode.fx = pinX; newNode.fy = pinY; }
+            merged.push(newNode);
+          }
+        });
+
+        nodesRef.current = merged;
+        edgesRef.current = [...wantedEdges.values()];
+        newNodeIdsRef.current = newNodeIds;
+        newEdgeIdsRef.current = newEdgeIds;
+
+        simRef.current.nodes(nodesRef.current);
+        simRef.current.force('link').links(edgesRef.current);
+        simRef.current.alpha(0.9).restart();
+      }, [beatIdx]);
+
+      useEffect(() => {
+        if (!autoPlay) return;
+        if (beatIdx >= BEATS.length - 1) { setAutoPlay(false); return; }
+        const t = setTimeout(() => setBeatIdx(i => i + 1), 3000);
+        return () => clearTimeout(t);
+      }, [autoPlay, beatIdx]);
+
+      const nodes = nodesRef.current;
+      const edges = edgesRef.current;
+      for (const n of nodes) {
+        if (n.x != null) {
+          n.x = Math.max(40, Math.min(VIEW_W - 40, n.x));
+          n.y = Math.max(40, Math.min(VIEW_H - 40, n.y));
+        }
+      }
+
+      const currentBeat = BEATS[beatIdx];
+
+      const auditSet = useMemo(() => {
+        if (!showAuditOnly) return null;
+        for (let i = beatIdx; i >= 0; i--) {
+          if (BEATS[i].auditChain) return new Set(BEATS[i].auditChain);
+        }
+        return null;
+      }, [beatIdx, showAuditOnly]);
+
+      const isVisible = (id) => !auditSet || auditSet.has(id);
+
+      const counts = useMemo(() => {
+        const c = {};
+        for (const n of nodes) c[n.kind] = (c[n.kind] || 0) + 1;
+        for (const e of edges) c[e.kind] = (c[e.kind] || 0) + 1;
+        return c;
+      }, [beatIdx, nodes.length, edges.length]);
+
+      const selectedNode = selectedId ? nodes.find(n => n.id === selectedId) : null;
+      const selectedConnections = useMemo(() => {
+        if (!selectedNode) return [];
+        const out = [];
+        for (const e of edges) {
+          const sId = typeof e.source === 'object' ? e.source.id : e.source;
+          const tId = typeof e.target === 'object' ? e.target.id : e.target;
+          if (sId === selectedNode.id) {
+            const other = nodes.find(n => n.id === tId);
+            if (other) out.push({ kind: e.kind, direction: 'out', other });
+          } else if (tId === selectedNode.id) {
+            const other = nodes.find(n => n.id === sId);
+            if (other) out.push({ kind: e.kind, direction: 'in', other });
+          }
+        }
+        return out;
+      }, [selectedId, beatIdx, edges.length, nodes.length]);
+
+      return (
+        <div style={{
+          minHeight: '100vh',
+          background: C.bg,
+          color: C.text,
+          fontFamily: '"Fraunces", Georgia, serif',
+          padding: '24px',
+          boxSizing: 'border-box',
+        }}>
+          <style>{`
+            @keyframes pulseRing {
+              0%, 100% { opacity: 0.7; r: var(--rBase); }
+              50% { opacity: 0.15; r: calc(var(--rBase) + 14px); }
+            }
+            @keyframes auditGlow {
+              0%, 100% { filter: drop-shadow(0 0 2px ${C.gold}); }
+              50%      { filter: drop-shadow(0 0 9px ${C.gold}); }
+            }
+            .grid-bg {
+              background-image:
+                linear-gradient(${C.gridLine} 1px, transparent 1px),
+                linear-gradient(90deg, ${C.gridLine} 1px, transparent 1px);
+              background-size: 32px 32px;
+            }
+            .mono { font-family: 'JetBrains Mono', monospace; }
+            button { font-family: inherit; cursor: pointer; transition: all 0.15s ease; }
+            button:disabled { cursor: not-allowed; opacity: 0.4; }
+          `}</style>
+
+          <header style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            borderBottom: `1px solid ${C.border}`,
+            paddingBottom: '16px',
+            marginBottom: '20px',
+          }}>
+            <div>
+              <div className="mono" style={{
+                fontSize: '11px', color: C.textDim, letterSpacing: '0.2em', marginBottom: '4px',
+              }}>
+                NECL · SCENARIO EXPLORER · v0.8 · MAP + DECISION LANE
+              </div>
+              <h1 style={{ margin: 0, fontSize: '32px', fontWeight: 500, letterSpacing: '-0.02em' }}>
+                The Brownout
+              </h1>
+              <div style={{ color: C.textMuted, fontSize: '15px', fontStyle: 'italic', marginTop: '4px' }}>
+                The mesh breathes. The graph builds itself.
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
+              <button
+                onClick={() => setTheme(t => t === 'dark' ? 'light' : 'dark')}
+                className="mono"
+                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                style={{
+                  background: 'transparent', color: C.textMuted,
+                  border: `1px solid ${C.border}`, padding: '6px 10px',
+                  fontSize: '10px', fontWeight: 500, letterSpacing: '0.15em', borderRadius: '3px',
+                }}
+              >
+                {theme === 'dark' ? '☼ LIGHT' : '☾ DARK'}
+              </button>
+              <div className="mono" style={{ fontSize: '11px', color: C.textDim, textAlign: 'right' }}>
+                BEAT {beatIdx.toString().padStart(2, '0')} / {(BEATS.length - 1).toString().padStart(2, '0')}<br />
+                NODES {nodes.length.toString().padStart(2, '0')} · EDGES {edges.length.toString().padStart(2, '0')}
+              </div>
+            </div>
+          </header>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 320px',
+            gap: '20px',
+            height: 'calc(100vh - 240px)',
+            minHeight: '720px',
+          }}>
+            {/* Graph canvas */}
+            <div style={{
+              background: C.bgPanel, border: `1px solid ${C.border}`,
+              borderRadius: '4px', position: 'relative', overflow: 'hidden',
+            }}>
+              <div className="grid-bg" style={{ position: 'absolute', inset: 0, opacity: theme === 'dark' ? 0.18 : 0.25, pointerEvents: 'none' }} />
+              <div className="mono" style={{
+                position: 'absolute', top: '12px', left: '14px',
+                fontSize: '10px', color: C.textDim, letterSpacing: '0.15em', zIndex: 2, pointerEvents: 'none',
+              }}>
+                REGION · WESTERN INTERCONNECT · ZONE 4
+              </div>
+              <div className="mono" style={{
+                position: 'absolute', top: '12px', right: '14px',
+                fontSize: '10px', color: showAuditOnly ? C.gold : C.textDim,
+                letterSpacing: '0.15em', zIndex: 2, pointerEvents: 'none',
+              }}>
+                {showAuditOnly ? 'AUDIT TRAVERSAL' : 'FULL GRAPH'}
+              </div>
+
+              {/* Zoom controls */}
+              <div style={{
+                position: 'absolute', bottom: '14px', right: '14px', zIndex: 2,
+                display: 'flex', flexDirection: 'column', gap: '4px',
+                background: C.bgSubtle, border: `1px solid ${C.border}`,
+                borderRadius: '4px', padding: '4px',
+              }}>
+                <button onClick={() => zoomBy(1.3)} className="mono" title="Zoom in" style={zoomBtnStyle(C)}>+</button>
+                <button onClick={() => zoomBy(1 / 1.3)} className="mono" title="Zoom out" style={zoomBtnStyle(C)}>−</button>
+                <button onClick={resetZoom} className="mono" title="Reset view" style={{ ...zoomBtnStyle(C), fontSize: '10px' }}>⊙</button>
+                <div className="mono" style={{ textAlign: 'center', fontSize: '9px', color: C.textDim, padding: '2px 0', letterSpacing: '0.05em' }}>
+                  {Math.round(zoomLevel * 100)}%
+                </div>
+              </div>
+
+              <div className="mono" style={{
+                position: 'absolute', bottom: '14px', left: '14px', zIndex: 2,
+                fontSize: '9px', color: C.textDim, letterSpacing: '0.1em',
+                lineHeight: 1.5, pointerEvents: 'none',
+              }}>
+                CLICK NODE TO INSPECT · DRAG TO PIN · DBL-CLICK TO RELEASE<br />
+                SCROLL TO ZOOM · DRAG BG TO PAN
+              </div>
+
+              <svg
+                ref={svgRef}
+                viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
+                preserveAspectRatio="xMidYMid meet"
+                style={{ width: '100%', height: '100%', display: 'block' }}
+              >
+                <defs>
+                  <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill={C.borderHi} />
+                  </marker>
+                  <marker id="arrow-audit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
+                    <path d="M 0 0 L 10 5 L 0 10 z" fill={C.gold} />
+                  </marker>
+                </defs>
+
+                <g ref={zoomGroupRef}>
+                  <rect className="zoom-bg" x={-2000} y={-2000} width={VIEW_W + 4000} height={VIEW_H + 4000} fill="transparent" />
+
+                  {/* Map background */}
+                  <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
+                    fill={C.mapBg} stroke={C.border} strokeWidth="1" rx="3" style={{ pointerEvents: 'none' }} />
+
+                  {/* Terrain contours */}
+                  <g style={{ pointerEvents: 'none', opacity: 0.5 }}>
+                    <path d={`M ${MAP_BOUNDS.x + 60} ${MAP_BOUNDS.y + 80} q 100 -20 200 10 t 200 30 t 200 -10`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
+                    <path d={`M ${MAP_BOUNDS.x + 30} ${MAP_BOUNDS.y + 200} q 120 30 240 0 t 240 -20 t 200 30`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
+                    <path d={`M ${MAP_BOUNDS.x + 80} ${MAP_BOUNDS.y + 380} q 90 -30 180 -5 t 180 20 t 200 -25`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
+                    <path d={`M ${MAP_BOUNDS.x + 20} ${MAP_BOUNDS.y + 540} q 130 20 260 -10 t 260 0 t 180 20`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
+                  </g>
+
+                  {/* Decision lane */}
+                  <rect x={LANE_X} y={MAP_BOUNDS.y - 10} width={VIEW_W - LANE_X - 30} height={MAP_BOUNDS.h + 20}
+                    fill={C.laneBg} stroke={C.border} strokeWidth="1" rx="3" style={{ pointerEvents: 'none' }} />
+
+                  {/* Labels */}
+                  <g style={{ pointerEvents: 'none' }}>
+                    <text x={MAP_BOUNDS.x} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">REGIONAL GRID · SCHEMATIC</text>
+                    <text x={LANE_X + 10} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">DECISION LANE</text>
+                  </g>
+
+                  {/* Data Center landmark */}
+                  <g style={{ pointerEvents: 'none' }}>
+                    <rect x={PLACES.dataCenter.x - 28} y={PLACES.dataCenter.y - 18} width={56} height={36} fill={C.warnDim} stroke={C.dataCenter} strokeWidth="1.5" rx="2" />
+                    <line x1={PLACES.dataCenter.x - 18} y1={PLACES.dataCenter.y - 8} x2={PLACES.dataCenter.x + 18} y2={PLACES.dataCenter.y - 8} stroke={C.dataCenter} strokeWidth="1" opacity="0.7" />
+                    <line x1={PLACES.dataCenter.x - 18} y1={PLACES.dataCenter.y} x2={PLACES.dataCenter.x + 18} y2={PLACES.dataCenter.y} stroke={C.dataCenter} strokeWidth="1" opacity="0.7" />
+                    <line x1={PLACES.dataCenter.x - 18} y1={PLACES.dataCenter.y + 8} x2={PLACES.dataCenter.x + 18} y2={PLACES.dataCenter.y + 8} stroke={C.dataCenter} strokeWidth="1" opacity="0.7" />
+                    <text x={PLACES.dataCenter.x} y={PLACES.dataCenter.y + 32} textAnchor="middle" fill={C.dataCenter} fontSize="9.5" fontFamily="JetBrains Mono, monospace" letterSpacing="0.1em" fontWeight="600">DATA CENTER · SITE Z</text>
+                  </g>
+
+                  {/* Disturbance zone halo */}
+                  {nodes.find(n => n.id === 'z1') && (() => {
+                    const members = ['c2', 'c3', 'c4'].map(id => nodes.find(n => n.id === id)).filter(Boolean);
+                    if (members.length === 0) return null;
+                    const cx = members.reduce((s, n) => s + n.x, 0) / members.length;
+                    const cy = members.reduce((s, n) => s + n.y, 0) / members.length;
+                    const maxDist = Math.max(...members.map(n => Math.hypot(n.x - cx, n.y - cy)));
+                    return (
+                      <g style={{ pointerEvents: 'none' }}>
+                        <circle cx={cx} cy={cy} r={maxDist + 50} fill={C.warn} opacity="0.08" />
+                        <circle cx={cx} cy={cy} r={maxDist + 50} fill="none" stroke={C.warn} strokeWidth="1.2" strokeDasharray="6 4" opacity="0.55" />
+                        <text x={cx} y={cy + maxDist + 68} textAnchor="middle" fill={C.warn} fontSize="9.5" fontFamily="JetBrains Mono, monospace" letterSpacing="0.15em" fontWeight="600">DISTURBANCE ZONE · zone-001</text>
+                      </g>
+                    );
+                  })()}
+
+                  {/* Edges */}
+                  {edges.map(e => {
+                    const s = typeof e.source === 'object' ? e.source : nodes.find(n => n.id === e.source);
+                    const t = typeof e.target === 'object' ? e.target : nodes.find(n => n.id === e.target);
+                    if (!s || !t || s.x == null || t.x == null) return null;
+                    if (!isVisible(e.id) || !isVisible(s.id) || !isVisible(t.id)) return null;
+
+                    const sStyle = NODE_STYLE[s.kind] || NODE_STYLE.DataCube;
+                    const tStyle = NODE_STYLE[t.kind] || NODE_STYLE.DataCube;
+                    const dx = t.x - s.x, dy = t.y - s.y;
+                    const len = Math.hypot(dx, dy) || 1;
+                    const ux = dx / len, uy = dy / len;
+                    const x1 = s.x + ux * (sStyle.r + 1);
+                    const y1 = s.y + uy * (sStyle.r + 1);
+                    const x2 = t.x - ux * (tStyle.r + 3);
+                    const y2 = t.y - uy * (tStyle.r + 3);
+
+                    const isInfra = e.kind === 'InterCubeLink';
+                    const inAudit = auditSet && auditSet.has(e.id);
+                    const isNew = newEdgeIdsRef.current.has(e.id);
+                    const stroke = inAudit ? C.gold : (isInfra ? C.transmission : C.borderHi);
+                    const strokeWidth = inAudit ? 2.4 : (isInfra ? 2.2 : 1.4);
+                    const opacity = inAudit ? 1 : (isInfra ? 0.85 : 0.75);
+
+                    return (
+                      <g key={e.id} style={inAudit ? { animation: 'auditGlow 2s ease-in-out infinite' } : {}}>
+                        {isInfra && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.transmission} strokeWidth={5} opacity={0.18} />}
+                        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity}
+                          markerEnd={isInfra ? undefined : (inAudit ? 'url(#arrow-audit)' : 'url(#arrow)')} />
+                        {isNew && !isInfra && (
+                          <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - 5} textAnchor="middle" fill={C.textMuted} fontSize="9" fontFamily="JetBrains Mono, monospace" letterSpacing="0.05em" style={{ pointerEvents: 'none' }}>
+                            {e.kind}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+
+                  {/* Nodes */}
+                  {nodes.map(n => {
+                    if (!isVisible(n.id)) return null;
+                    if (n.x == null) return null;
+                    const style = NODE_STYLE[n.kind] || NODE_STYLE.DataCube;
+                    const inAudit = auditSet && auditSet.has(n.id);
+                    const isPulse = n.pulse;
+                    const isPinned = n.fx != null;
+                    const isSelected = selectedId === n.id;
+
+                    return (
+                      <g key={n.id} className="node-group" data-id={n.id}
+                        transform={`translate(${n.x},${n.y})`}
+                        style={{ cursor: 'grab', touchAction: 'none' }}
+                        onDoubleClick={(e) => handleNodeDoubleClick(e, n)}
+                      >
+                        {isSelected && <circle cx={0} cy={0} r={style.r + 8} fill="none" stroke={C.text} strokeWidth="1.8" strokeDasharray="3 3" opacity="0.9" style={{ pointerEvents: 'none' }} />}
+                        {isPulse && (
+                          <circle cx={0} cy={0} r={style.r + 6} fill="none"
+                            stroke={n.kind === 'Disturbance' ? C.warn : C.accent} strokeWidth="1.4"
+                            style={{ '--rBase': `${style.r + 6}px`, animation: 'pulseRing 1.6s ease-in-out infinite', transformOrigin: 'center', pointerEvents: 'none' }} />
+                        )}
+                        <circle cx={0} cy={0} r={style.r} fill={style.fill}
+                          stroke={inAudit ? C.gold : style.stroke} strokeWidth={inAudit ? 2.5 : 1.5}
+                          style={inAudit ? { animation: 'auditGlow 2s ease-in-out infinite' } : {}} />
+                        {isPinned && (
+                          <circle cx={style.r * 0.7} cy={-style.r * 0.7} r={3.5} fill={C.accent} stroke={C.bgPanel} strokeWidth={1.2} style={{ pointerEvents: 'none' }}>
+                            <title>Pinned — double-click to release</title>
+                          </circle>
+                        )}
+                        <text x={0} y={4} textAnchor="middle" fill={style.stroke} fontSize={style.r * 0.9} fontFamily="JetBrains Mono, monospace" style={{ pointerEvents: 'none' }}>
+                          {style.glyph}
+                        </text>
+                        <text x={0} y={style.r + 14} textAnchor="middle" fill={C.textMuted} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.05em" style={{ pointerEvents: 'none' }}>
+                          {n.label}
+                        </text>
+                        {n.kind === 'DataCube' && PLACES[n.placeId]?.name && (
+                          <text x={0} y={style.r + 26} textAnchor="middle" fill={C.textDim} fontSize="9" fontFamily="JetBrains Mono, monospace" letterSpacing="0.03em" style={{ pointerEvents: 'none' }}>
+                            {PLACES[n.placeId].name}
+                          </text>
+                        )}
+                        {n.kind !== 'DataCube' && (
+                          <text x={0} y={style.r + 26} textAnchor="middle" fill={C.textDim} fontSize="9" fontFamily="JetBrains Mono, monospace" letterSpacing="0.05em" style={{ pointerEvents: 'none' }}>
+                            :{n.kind}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+              </svg>
+            </div>
+
+            {/* Side panel */}
+            <div style={{
+              background: C.bgPanel, border: `1px solid ${C.border}`,
+              borderRadius: '4px', padding: '20px',
+              display: 'flex', flexDirection: 'column', gap: '20px', overflowY: 'auto',
+            }}>
+              {selectedNode ? (
+                <NodeInspector
+                  node={selectedNode}
+                  connections={selectedConnections}
+                  meta={KIND_META[selectedNode.kind]}
+                  style={NODE_STYLE[selectedNode.kind]}
+                  C={C}
+                  onClose={() => setSelectedId(null)}
+                />
+              ) : (
+                <>
+                  <div>
+                    <div className="mono" style={{ fontSize: '10px', color: C.accent, letterSpacing: '0.2em', marginBottom: '6px' }}>
+                      BEAT {beatIdx.toString().padStart(2, '0')}
+                    </div>
+                    <div style={{ fontSize: '22px', fontWeight: 600, lineHeight: 1.2, marginBottom: '6px' }}>
+                      {currentBeat.title}
+                    </div>
+                    <div style={{ fontStyle: 'italic', color: C.textMuted, fontSize: '14px', lineHeight: 1.45 }}>
+                      {currentBeat.subtitle}
+                    </div>
+                  </div>
+
+                  <div style={{ background: C.bgSubtle, border: `1px solid ${C.border}`, borderRadius: '3px', padding: '14px' }}>
+                    <div className="mono" style={{ fontSize: '9px', color: C.textDim, letterSpacing: '0.2em', marginBottom: '8px' }}>OPERATOR CONSOLE</div>
+                    <div className="mono" style={{ fontSize: '11.5px', color: C.text, lineHeight: 1.55 }}>{currentBeat.operatorView}</div>
+                  </div>
+
+                  {currentBeat.narrative && (
+                    <div style={{ borderLeft: `2px solid ${C.accent}`, paddingLeft: '12px', fontSize: '13px', color: C.textMuted, fontStyle: 'italic', lineHeight: 1.5 }}>
+                      {currentBeat.narrative}
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="mono" style={{ fontSize: '9px', color: C.textDim, letterSpacing: '0.2em', marginBottom: '8px' }}>GRAPH STATE</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      {Object.entries(counts).sort().map(([kind, n]) => (
+                        <div key={kind} className="mono" style={{
+                          display: 'flex', justifyContent: 'space-between',
+                          fontSize: '11px', padding: '4px 0', borderBottom: `1px dashed ${C.border}`,
+                        }}>
+                          <span style={{ color: NODE_STYLE[kind]?.stroke || C.textMuted }}>:{kind}</span>
+                          <span style={{ color: C.text }}>{n}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="mono" style={{ fontSize: '10px', color: C.textDim, letterSpacing: '0.05em', lineHeight: 1.5, paddingTop: '4px', borderTop: `1px dashed ${C.border}` }}>
+                    ⓘ Click any node to inspect its properties.
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Controls */}
+          <div style={{ marginTop: '20px', display: 'flex', gap: '12px', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button onClick={() => { setBeatIdx(0); setAutoPlay(false); setShowAuditOnly(false); nodesRef.current = []; edgesRef.current = []; }} style={btnStyle(C)}>⟲ RESET</button>
+              <button onClick={() => setBeatIdx(i => Math.max(0, i - 1))} disabled={beatIdx === 0} style={btnStyle(C)}>◀ BACK</button>
+              <button onClick={() => setBeatIdx(i => Math.min(BEATS.length - 1, i + 1))} disabled={beatIdx === BEATS.length - 1} style={btnStyle(C, { accent: true })}>NEXT BEAT ▶</button>
+              <button onClick={() => setAutoPlay(p => !p)} disabled={beatIdx === BEATS.length - 1 && !autoPlay} style={btnStyle(C)}>{autoPlay ? '❚❚ PAUSE' : '▶ AUTOPLAY'}</button>
+            </div>
+            <div>
+              <button onClick={() => setShowAuditOnly(s => !s)} disabled={beatIdx < BEATS.length - 1} style={btnStyle(C, { gold: showAuditOnly })}>
+                {showAuditOnly ? '◉ AUDIT CHAIN ON' : '○ SHOW AUDIT CHAIN'}
+              </button>
+            </div>
+          </div>
+
+          {/* Beat strip */}
+          <div style={{ marginTop: '16px', display: 'flex', gap: '4px', height: '6px' }}>
+            {BEATS.map((b, i) => (
+              <div key={i} onClick={() => setBeatIdx(i)} title={b.title}
+                style={{
+                  flex: 1, background: i <= beatIdx ? C.accent : C.border,
+                  opacity: i === beatIdx ? 1 : (i < beatIdx ? 0.55 : 0.3),
+                  cursor: 'pointer', borderRadius: '2px', transition: 'all 0.2s ease',
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="mono" style={{ marginTop: '14px', fontSize: '10px', color: C.textDim, letterSpacing: '0.1em', textAlign: 'center' }}>
+            STAGE NOT THE PLAY · KERNEL WORDS BUILDING THEMSELVES
+          </div>
+        </div>
+      );
+    }
+
+    function NodeInspector({ node, connections, meta, style, C, onClose }) {
+      const props = meta?.props ? meta.props(node) : [['id', node.id], ['label', node.label]];
+
+      return (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0 }}>
+              <div style={{
+                width: '44px', height: '44px', borderRadius: '50%',
+                background: style?.fill || C.bgSubtle, border: `1.5px solid ${style?.stroke || C.border}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: style?.stroke || C.text, fontFamily: 'JetBrains Mono, monospace',
+                fontSize: '20px', flexShrink: 0,
+              }}>
+                {style?.glyph || '○'}
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div className="mono" style={{ fontSize: '10px', color: C.accent, letterSpacing: '0.2em', marginBottom: '4px' }}>NODE INSPECTOR</div>
+                <div className="mono" style={{ fontSize: '15px', fontWeight: 600, color: style?.stroke || C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  :{node.kind}
+                </div>
+              </div>
+            </div>
+            <button onClick={onClose} aria-label="Close inspector" className="mono"
+              style={{ background: 'transparent', color: C.textMuted, border: `1px solid ${C.border}`, borderRadius: '3px', width: '24px', height: '24px', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
+              ×
+            </button>
+          </div>
+
+          {meta && (
+            <>
+              <div style={{ background: C.bgSubtle, border: `1px solid ${C.border}`, borderRadius: '3px', padding: '14px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  <div className="mono" style={{ fontSize: '9px', letterSpacing: '0.15em', color: meta.kernel === 'load-bearing' ? C.accent : C.warn, border: `1px solid ${meta.kernel === 'load-bearing' ? C.accent : C.warn}`, padding: '2px 6px', borderRadius: '2px' }}>
+                    {meta.kernel === 'load-bearing' ? 'KERNEL · LOAD-BEARING' : 'MISSION-SPECIFIC'}
+                  </div>
+                  <div className="mono" style={{ fontSize: '9px', letterSpacing: '0.15em', color: C.warn, border: `1px solid ${C.warn}`, padding: '2px 6px', borderRadius: '2px' }}>
+                    MISSION · BROWNOUT
+                  </div>
+                </div>
+                <div style={{ fontSize: '13px', color: C.text, lineHeight: 1.5 }}>{meta.inMission}</div>
+              </div>
+              {meta.kernelNote && (
+                <div style={{ borderLeft: `2px solid ${C.accent}`, paddingLeft: '12px', fontSize: '12px', color: C.textMuted, fontStyle: 'italic', lineHeight: 1.5 }}>
+                  <div className="mono" style={{ fontSize: '9px', color: C.accent, letterSpacing: '0.15em', marginBottom: '4px', fontStyle: 'normal' }}>IN THE KERNEL</div>
+                  {meta.kernelNote}
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <div className="mono" style={{ fontSize: '9px', color: C.textDim, letterSpacing: '0.2em', marginBottom: '8px' }}>PROPERTIES</div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {props.map(([k, v]) => (
+                <div key={k} className="mono" style={{ display: 'grid', gridTemplateColumns: '110px 1fr', gap: '10px', fontSize: '11px', padding: '6px 0', borderBottom: `1px dashed ${C.border}` }}>
+                  <span style={{ color: C.textMuted }}>{k}</span>
+                  <span style={{ color: C.text, wordBreak: 'break-word' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mono" style={{ fontSize: '9px', color: C.textDim, letterSpacing: '0.2em', marginBottom: '8px' }}>CONNECTIONS · {connections.length}</div>
+            {connections.length === 0 ? (
+              <div className="mono" style={{ fontSize: '11px', color: C.textDim, fontStyle: 'italic' }}>No connections in current graph state.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                {connections.map((c, i) => (
+                  <div key={i} className="mono" style={{ fontSize: '10.5px', padding: '6px 8px', background: C.bgSubtle, border: `1px solid ${C.border}`, borderRadius: '2px', lineHeight: 1.4 }}>
+                    <span style={{ color: C.textDim }}>{c.direction === 'out' ? '→' : '←'}</span>
+                    {' '}<span style={{ color: C.cyan }}>:{c.kind}</span>
+                    {' '}<span style={{ color: C.textDim }}>→</span>
+                    {' '}<span style={{ color: C.text }}>{c.other.label}</span>
+                    {' '}<span style={{ color: C.textMuted }}>:{c.other.kind}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="mono" style={{ fontSize: '10px', color: C.textDim, letterSpacing: '0.05em', lineHeight: 1.5, paddingTop: '4px', borderTop: `1px dashed ${C.border}` }}>
+            ⓘ Click another node to inspect, or × to return to beat view.
+          </div>
+        </>
+      );
+    }
+
+    function btnStyle(C, { accent = false, gold = false } = {}) {
+      return {
+        background: gold ? C.gold : (accent ? C.accent : 'transparent'),
+        color: gold ? C.bg : (accent ? C.bg : C.text),
+        border: `1px solid ${gold ? C.gold : (accent ? C.accent : C.border)}`,
+        padding: '9px 14px', fontSize: '11px',
+        fontFamily: 'JetBrains Mono, monospace',
+        fontWeight: 500, letterSpacing: '0.1em', borderRadius: '3px',
+      };
+    }
+
+    function zoomBtnStyle(C) {
+      return {
+        background: 'transparent', color: C.text,
+        border: `1px solid ${C.border}`,
+        width: '28px', height: '28px', fontSize: '14px',
+        fontFamily: 'JetBrains Mono, monospace',
+        fontWeight: 500, borderRadius: '3px',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 0, lineHeight: 1,
+      };
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<NECLExplorer />);
+  </script>
+</body>
+</html>

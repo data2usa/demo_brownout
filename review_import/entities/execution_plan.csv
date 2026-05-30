@@ -1,0 +1,2 @@
+plan_id,label,plan_format,dispatch_actions,expected_freq_recovery_hz,expected_headroom_mw,estimated_execution_time_sec,rendered_at
+plan-001,plan-001,human-reviewable,3,0.07,180.0,12,2026-05-30T14:22:15Z

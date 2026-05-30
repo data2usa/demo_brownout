@@ -1,0 +1,4 @@
+observation_id,label,tag,value,baseline,observed_at,confidence
+obs-001,GenP,SensorPower_GenP.MW,287.4,332.1,2026-05-30T14:22:01Z,0.97
+obs-002,V-sag,SensorPower_V.pu,0.973,1.002,2026-05-30T14:22:01Z,0.97
+obs-003,freq,SensorFreq.Hz,59.92,60.00,2026-05-30T14:22:01Z,0.97

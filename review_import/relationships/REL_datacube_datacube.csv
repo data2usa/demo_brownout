@@ -1,0 +1,8 @@
+source_cube_id,target_cube_id,link_id,link_status
+cube-001,cube-002,l12,NOMINAL
+cube-002,cube-003,l23,NOMINAL
+cube-002,cube-004,l24,NOMINAL
+cube-003,cube-004,l34,NOMINAL
+cube-001,cube-004,l14,NOMINAL
+cube-004,cube-005,l45,NOMINAL
+cube-001,cube-005,l15,NOMINAL

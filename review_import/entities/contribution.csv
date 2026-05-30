@@ -1,0 +1,4 @@
+contribution_id,label,proposed_action,rationale,outcome,submitted_at
+contrib-002,c-002,Ramp gen-12 by +60 MW,gen-12 has fastest ramp rate in zone,PARTIALLY_ADOPTED,2026-05-30T14:22:12Z
+contrib-003,c-003,"Split load: gen-12 +40 MW, gen-15 +20 MW",Splitting reduces single-asset stress; preserves reserve,ADOPTED,2026-05-30T14:22:12Z
+contrib-004,c-004,Hold line L-22 below 90% thermal limit,Line L-22 already at 87% — single-contingency at risk,CONSTRAINT_HONORED,2026-05-30T14:22:12Z

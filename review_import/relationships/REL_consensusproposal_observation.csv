@@ -1,0 +1,3 @@
+proposal_id,observation_id,evidence_type
+prop-001,obs-001,primary_power_evidence
+prop-001,obs-002,primary_voltage_evidence

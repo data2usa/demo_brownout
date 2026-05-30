@@ -1,0 +1,4 @@
+observation_id,disturbance_id,contribution_type
+obs-001,disturbance-001,power_delta
+obs-002,disturbance-001,voltage_sag
+obs-003,disturbance-001,frequency_deviation
