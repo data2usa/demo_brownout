@@ -8,14 +8,14 @@ A self-contained design artifact for the **NECL Brownout v1.2** scenario — one
 
 There is no build system, no package manager, and no test runner. The deliverables are:
 
-- `necl-explorer.html` — a single-file interactive scenario walkthrough
+- `index.html` — a single-file interactive scenario walkthrough
 - `review_import/` — CSV data and a `workflow.json` import spec for loading the scenario into a graph database (Memgraph/Neo4j)
 
 ## Running the explorer
 
-Open `necl-explorer.html` directly in a browser — no server required. It uses CDN-loaded React 18, D3 v7, and Babel standalone. The file is entirely self-contained.
+Open `index.html` directly in a browser — no server required. It uses CDN-loaded React 18, D3 v7, and Babel standalone. The file is entirely self-contained.
 
-## Architecture of necl-explorer.html
+## Architecture of index.html
 
 The file is a single-page React app written in JSX inside a `<script type="text/babel">` block. Key sections in order:
 

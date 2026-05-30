@@ -1,5 +1,7 @@
 # NECL Brownout v1.2 — Scenario Design
 
+**[Live demo →](https://data2usa.github.io/demo_brownout/)**
+
 An interactive scenario design artifact showing how a mesh of edge-deployed **DataCubes** detect a grid disturbance, negotiate a dispatch response, and produce a human-approved execution plan — all modelled as a live property graph.
 
 This is one scenario in the **EdgeWorks** "load-bearing" design library. It is intended for demonstration, review, and graph import — not production deployment.
@@ -26,7 +28,7 @@ A data center throws its main switch. An unannounced +180 MW load hits the North
 ## Files
 
 ```
-necl-explorer.html          Interactive scenario walkthrough (open in browser)
+index.html                  Interactive scenario walkthrough (open in browser, or visit GitHub Pages)
 review_import/
   workflow.json             Graph import spec (Memgraph / Neo4j IngestStructured)
   entities/                 10 CSV files — one per node type
@@ -37,7 +39,7 @@ review_import/
 
 ## Running the explorer
 
-Open `necl-explorer.html` directly in a browser — no server, no install, no build step required. The file is entirely self-contained (React 18, D3 v7, and Babel are loaded from CDN).
+Open `index.html` directly in a browser, or visit the live GitHub Pages link above. No server, no install, no build step required. The file is entirely self-contained (React 18, D3 v7, and Babel are loaded from CDN).
 
 Use the **Next / Prev** buttons to step through beats. Click any node to inspect its properties. Toggle **Audit chain** on the final beat to highlight the full evidence path from raw observation to approved execution plan.
 
