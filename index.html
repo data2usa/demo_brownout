@@ -448,7 +448,7 @@
       const [beatIdx, setBeatIdx] = useState(0);
       const [autoPlay, setAutoPlay] = useState(false);
       const [showAuditOnly, setShowAuditOnly] = useState(false);
-      const [theme, setTheme] = useState('dark');
+      const [theme, setTheme] = useState('light');
       const [, setTick] = useState(0);
 
       const C = THEMES[theme];
@@ -828,22 +828,36 @@
                   <marker id="arrow-audit" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
                     <path d="M 0 0 L 10 5 L 0 10 z" fill={C.gold} />
                   </marker>
+                  <clipPath id="mapClip">
+                    <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20} rx="3" />
+                  </clipPath>
                 </defs>
 
                 <g ref={zoomGroupRef}>
                   <rect className="zoom-bg" x={-2000} y={-2000} width={VIEW_W + 4000} height={VIEW_H + 4000} fill="transparent" />
 
-                  {/* Map background */}
-                  <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
-                    fill={C.mapBg} stroke={C.border} strokeWidth="1" rx="3" style={{ pointerEvents: 'none' }} />
-
-                  {/* Terrain contours */}
-                  <g style={{ pointerEvents: 'none', opacity: 0.5 }}>
-                    <path d={`M ${MAP_BOUNDS.x + 60} ${MAP_BOUNDS.y + 80} q 100 -20 200 10 t 200 30 t 200 -10`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
-                    <path d={`M ${MAP_BOUNDS.x + 30} ${MAP_BOUNDS.y + 200} q 120 30 240 0 t 240 -20 t 200 30`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
-                    <path d={`M ${MAP_BOUNDS.x + 80} ${MAP_BOUNDS.y + 380} q 90 -30 180 -5 t 180 20 t 200 -25`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
-                    <path d={`M ${MAP_BOUNDS.x + 20} ${MAP_BOUNDS.y + 540} q 130 20 260 -10 t 260 0 t 180 20`} fill="none" stroke={C.mapContour} strokeWidth="0.8" />
+                  {/* Map background — OSM tiles centered on Calgary (51.0447°N, 114.0719°W), zoom 11 */}
+                  {/* Tile grid: x 373-376, y 684-686. Calgary center lands at pixel (504, 358) in the grid, */}
+                  {/* which maps to SVG (470, 360) — the centre of MAP_BOUNDS. Grid origin: SVG (-34, 2).   */}
+                  <g clipPath="url(#mapClip)" style={{ pointerEvents: 'none' }}>
+                    {[373, 374, 375, 376].flatMap((tx, xi) =>
+                      [684, 685, 686].map((ty, yi) => (
+                        <image
+                          key={`tile-${tx}-${ty}`}
+                          href={`https://tile.openstreetmap.org/11/${tx}/${ty}.png`}
+                          x={-34 + xi * 256}
+                          y={2 + yi * 256}
+                          width={256}
+                          height={256}
+                        />
+                      ))
+                    )}
+                    {/* Theme tint — heavier in dark mode to keep schematic readable */}
+                    <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
+                      fill={C.mapBg} opacity={theme === 'dark' ? 0.55 : 0.08} />
                   </g>
+                  <rect x={MAP_BOUNDS.x - 10} y={MAP_BOUNDS.y - 10} width={MAP_BOUNDS.w + 20} height={MAP_BOUNDS.h + 20}
+                    fill="none" stroke={C.border} strokeWidth="1" rx="3" style={{ pointerEvents: 'none' }} />
 
                   {/* Decision lane */}
                   <rect x={LANE_X} y={MAP_BOUNDS.y - 10} width={VIEW_W - LANE_X - 30} height={MAP_BOUNDS.h + 20}
@@ -851,8 +865,9 @@
 
                   {/* Labels */}
                   <g style={{ pointerEvents: 'none' }}>
-                    <text x={MAP_BOUNDS.x} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">REGIONAL GRID · SCHEMATIC</text>
+                    <text x={MAP_BOUNDS.x} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">REGIONAL GRID · CALGARY · SCHEMATIC</text>
                     <text x={LANE_X + 10} y={MAP_BOUNDS.y - 18} fill={C.textDim} fontSize="10" fontFamily="JetBrains Mono, monospace" letterSpacing="0.2em">DECISION LANE</text>
+                    <text x={MAP_BOUNDS.x + MAP_BOUNDS.w - 2} y={MAP_BOUNDS.y + MAP_BOUNDS.h + 15} textAnchor="end" fill={C.textDim} fontSize="8" fontFamily="JetBrains Mono, monospace" opacity="0.6">© OpenStreetMap contributors</text>
                   </g>
 
                   {/* Data Center landmark */}
