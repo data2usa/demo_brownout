@@ -915,13 +915,13 @@
                     const isInfra = e.kind === 'InterCubeLink';
                     const inAudit = auditSet && auditSet.has(e.id);
                     const isNew = newEdgeIdsRef.current.has(e.id);
-                    const stroke = inAudit ? C.gold : (isInfra ? C.transmission : C.borderHi);
-                    const strokeWidth = inAudit ? 2.4 : (isInfra ? 2.2 : 1.4);
-                    const opacity = inAudit ? 1 : (isInfra ? 0.85 : 0.75);
+                    const stroke = inAudit ? C.gold : (isInfra ? C.textMuted : C.text);
+                    const strokeWidth = inAudit ? 2.8 : (isInfra ? 3.0 : 2.2);
+                    const opacity = inAudit ? 1 : (isInfra ? 0.7 : 0.65);
 
                     return (
                       <g key={e.id} style={inAudit ? { animation: 'auditGlow 2s ease-in-out infinite' } : {}}>
-                        {isInfra && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.transmission} strokeWidth={5} opacity={0.18} />}
+                        {isInfra && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={C.transmission} strokeWidth={7} opacity={0.25} />}
                         <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={stroke} strokeWidth={strokeWidth} opacity={opacity}
                           markerEnd={isInfra ? undefined : (inAudit ? 'url(#arrow-audit)' : 'url(#arrow)')} />
                         {isNew && !isInfra && (
