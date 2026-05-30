@@ -41,6 +41,15 @@ review_import/
 
 Open `index.html` directly in a browser, or visit the live GitHub Pages link above. No server, no install, no build step required. The file is entirely self-contained (React 18, D3 v7, and Babel are loaded from CDN).
 
+**Live links by theme:**
+
+| Theme | URL |
+|-------|-----|
+| Dark (default) | [demo_brownout/?mode=dark](https://data2usa.github.io/demo_brownout/?mode=dark) |
+| Light | [demo_brownout/?mode=light](https://data2usa.github.io/demo_brownout/?mode=light) |
+
+Locally, append `?mode=dark` or `?mode=light` to the file URL, e.g. `file:///path/to/index.html?mode=light`.
+
 Use the **Next / Prev** buttons to step through beats. Click any node to inspect its properties. Toggle **Audit chain** on the final beat to highlight the full evidence path from raw observation to approved execution plan.
 
 ---
